@@ -1,10 +1,10 @@
-# 服务注册与发现中心
+# register-center 注册中心
 
 [![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.3.4-brightgreen)](https://spring.io/projects/spring-boot)
 [![Java](https://img.shields.io/badge/Java-21-orange)](https://www.oracle.com/java/technologies/javase/jdk21-archive-downloads.html)
 [![License](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 
-服务注册与发现中心是一个基于Spring Boot开发的微服务注册中心，提供服务注册、心跳检测、服务发现、虚拟域名访问、限流控制等功能。
+register-center服务注册与发现中心是一个基于Spring Boot开发的微服务注册中心，提供服务注册、心跳检测、服务发现、虚拟域名访问、限流控制等功能。
 
 ![register-center](/data/p1.jpg)
 

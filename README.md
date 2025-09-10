@@ -58,7 +58,7 @@ register-center/
 
 ```bash
 # 克隆项目
-git clone <repository-url>
+git clone git@github.com:vvoooxx/register-center.git
 cd register-center
 
 # 构建项目

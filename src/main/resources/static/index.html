@@ -1,0 +1,652 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>服务注册中心控制台</title>
+    <!-- 引入Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- 引入Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <!-- 引入Vue 3 -->
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <!-- 引入Axios -->
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    <!-- 配置Tailwind CSS -->
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#165DFF',
+                        secondary: '#36BFFA',
+                        success: '#00B42A',
+                        warning: '#FF7D00',
+                        danger: '#F53F3F',
+                        info: '#86909C',
+                        dark: '#1D2129',
+                        light: '#F2F3F5'
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'system-ui', 'sans-serif'],
+                    },
+                }
+            }
+        }
+    </script>
+    <style type="text/tailwindcss">
+        @layer utilities {
+            .content-auto {
+                content-visibility: auto;
+            }
+            .card-shadow {
+                box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+            }
+            .transition-all-300 {
+                transition: all 0.3s ease;
+            }
+            .notification-slide-in {
+                animation: slideIn 0.3s ease-out;
+            }
+            .notification-slide-out {
+                animation: slideOut 0.3s ease-in;
+            }
+            @keyframes slideIn {
+                from { transform: translateY(-20px); opacity: 0; }
+                to { transform: translateY(0); opacity: 1; }
+            }
+            @keyframes slideOut {
+                from { transform: translateY(0); opacity: 1; }
+                to { transform: translateY(-20px); opacity: 0; }
+            }
+        }
+    </style>
+</head>
+<body class="bg-gray-50 text-dark min-h-screen">
+    <div id="app" class="flex flex-col min-h-screen">
+        <!-- 自动消失通知组件 -->
+        <div v-if="showNotification" :class="['fixed top-20 left-1/2 transform -translate-x-1/2 z-50 px-6 py-3 rounded-lg shadow-lg flex items-center', notificationTypeClasses]" :key="notificationKey">
+            <i :class="['mr-2', notificationIcon]"></i>
+            <span>{{ notificationMessage }}</span>
+        </div>
+        <!-- 导航栏 -->
+        <header class="bg-white shadow-sm fixed w-full top-0 z-50 transition-all duration-300" :class="{ 'shadow-md': isScrolled }">
+            <div class="container mx-auto px-4 py-3 flex items-center justify-between">
+                <div class="flex items-center space-x-2">
+                    <i class="fa fa-server text-primary text-2xl"></i>
+                    <h1 class="text-xl font-bold text-primary">服务注册中心</h1>
+                </div>
+                <nav class="hidden md:flex items-center space-x-6">
+                    <a href="#dashboard" class="nav-link font-medium text-dark hover:text-primary">首页</a>
+                    <a href="#services" class="nav-link font-medium text-dark hover:text-primary">服务管理</a>
+                    <a href="#settings" class="nav-link font-medium text-dark hover:text-primary">系统设置</a>
+                </nav>
+                <div class="flex items-center space-x-3">
+                    <button class="hidden md:flex items-center px-4 py-2 rounded bg-primary text-white hover:bg-primary/90 transition-all-300" @click="showRegisterModal = true">
+                        <i class="fa fa-plus mr-2"></i>
+                        <span>注册服务</span>
+                    </button>
+                    <button class="md:hidden text-dark text-xl" @click="toggleMobileMenu">
+                        <i class="fa fa-bars"></i>
+                    </button>
+                </div>
+            </div>
+            
+            <!-- 移动端导航菜单 -->
+            <div v-if="showMobileMenu" class="md:hidden fixed inset-0 bg-black/50 z-40" @click="closeMobileMenu"></div>
+            <div v-if="showMobileMenu" class="md:hidden fixed top-0 right-0 w-64 h-full bg-white shadow-lg z-50 transform transition-transform duration-300 ease-in-out">
+                <div class="flex justify-between items-center p-4 border-b">
+                    <h3 class="font-semibold text-lg">菜单</h3>
+                    <button @click="closeMobileMenu" class="text-gray-400 hover:text-gray-600">
+                        <i class="fa fa-times"></i>
+                    </button>
+                </div>
+                <div class="p-4">
+                    <nav class="flex flex-col space-y-4">
+                        <a href="#dashboard" class="nav-link font-medium text-dark hover:text-primary py-2" @click="closeMobileMenu">首页</a>
+                        <a href="#services" class="nav-link font-medium text-dark hover:text-primary py-2" @click="closeMobileMenu">服务管理</a>
+                        <a href="#settings" class="nav-link font-medium text-dark hover:text-primary py-2" @click="closeMobileMenu">系统设置</a>
+                        <button class="flex items-center px-4 py-2 rounded bg-primary text-white hover:bg-primary/90 transition-all-300 mt-4" @click="{ showRegisterModal = true; closeMobileMenu() }">
+                            <i class="fa fa-plus mr-2"></i>
+                            <span>注册服务</span>
+                        </button>
+                    </nav>
+                </div>
+            </div>
+        </header>
+        
+        <!-- 主内容区域 -->
+        <main class="flex-grow pt-20 px-4 pb-12">
+            <div class="container mx-auto max-w-6xl">
+                <!-- 仪表盘统计卡片 -->
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                    <div class="bg-white rounded-lg p-6 card-shadow transition-all-300 hover:shadow-lg">
+                        <div class="flex items-center justify-between mb-4">
+                            <h3 class="text-gray-500 font-medium">总服务数</h3>
+                            <div class="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary">
+                                <i class="fa fa-cubes"></i>
+                            </div>
+                        </div>
+                        <div class="flex items-end">
+                            <span class="text-3xl font-bold">{{ totalServices }}</span>
+                            <span class="ml-2 text-sm text-success flex items-center"><i class="fa fa-arrow-up mr-1"></i>较上周增长5%</span>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-white rounded-lg p-6 card-shadow transition-all-300 hover:shadow-lg">
+                        <div class="flex items-center justify-between mb-4">
+                            <h3 class="text-gray-500 font-medium">在线服务</h3>
+                            <div class="w-10 h-10 rounded-full bg-success/10 flex items-center justify-center text-success">
+                                <i class="fa fa-check-circle"></i>
+                            </div>
+                        </div>
+                        <div class="flex items-end">
+                            <span class="text-3xl font-bold">{{ onlineServices }}</span>
+                            <span class="ml-2 text-sm text-success flex items-center"><i class="fa fa-arrow-up mr-1"></i>较上周增长3%</span>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-white rounded-lg p-6 card-shadow transition-all-300 hover:shadow-lg">
+                        <div class="flex items-center justify-between mb-4">
+                            <h3 class="text-gray-500 font-medium">实例总数</h3>
+                            <div class="w-10 h-10 rounded-full bg-secondary/10 flex items-center justify-center text-secondary">
+                                <i class="fa fa-clone"></i>
+                            </div>
+                        </div>
+                        <div class="flex items-end">
+                            <span class="text-3xl font-bold">{{ totalInstances }}</span>
+                            <span class="ml-2 text-sm text-success flex items-center"><i class="fa fa-arrow-up mr-1"></i>较上周增长8%</span>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-white rounded-lg p-6 card-shadow transition-all-300 hover:shadow-lg">
+                        <div class="flex items-center justify-between mb-4">
+                            <h3 class="text-gray-500 font-medium">平均响应时间</h3>
+                            <div class="w-10 h-10 rounded-full bg-warning/10 flex items-center justify-center text-warning">
+                                <i class="fa fa-tachometer-alt"></i>
+                            </div>
+                        </div>
+                        <div class="flex items-end">
+                            <span class="text-3xl font-bold">{{ avgResponseTime }}ms</span>
+                            <span class="ml-2 text-sm text-danger flex items-center"><i class="fa fa-arrow-up mr-1"></i>较上周增长2ms</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 服务列表 -->
+                <div class="bg-white rounded-lg p-6 card-shadow">
+                    <div class="flex flex-col md:flex-row md:items-center md:justify-between mb-6">
+                        <div class="flex items-center mb-4 md:mb-0 gap-3">
+                            <h2 class="text-xl font-bold">服务列表</h2>
+                            <button 
+                                @click="refreshServiceStatuses" 
+                                class="flex items-center px-3 py-1.5 rounded bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors"
+                                title="手动刷新"
+                            >
+                                <i class="fa fa-sync-alt mr-1.5"></i>
+                                <span class="text-sm">刷新</span>
+                            </button>
+                            <button 
+                                @click="toggleAutoRefresh" 
+                                :class="[
+                                    'flex items-center px-3 py-1.5 rounded transition-colors',
+                                    isAutoRefreshEnabled ? 'bg-success/10 text-success' : 'bg-warning/10 text-warning'
+                                ]"
+                                :title="isAutoRefreshEnabled ? '关闭自动刷新' : '开启自动刷新'"
+                            >
+                                <i :class="[
+                                    'fa mr-1.5',
+                                    isAutoRefreshEnabled ? 'fa-stop-circle' : 'fa-play-circle'
+                                ]"></i>
+                                <span class="text-sm">
+                                    {{ isAutoRefreshEnabled ? '自动刷新中' : '自动刷新' }}
+                                </span>
+                            </button>
+                        </div>
+                        <div class="flex flex-col sm:flex-row gap-4">
+                            <div class="relative">
+                                <input type="text" placeholder="搜索服务名称..." v-model="searchQuery" class="pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/50 w-full sm:w-64">
+                                <i class="fa fa-search absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
+                            </div>
+                            <select v-model="statusFilter" class="border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-primary/50 bg-white">
+                                <option value="all">全部状态</option>
+                                <option value="UP">在线</option>
+                                <option value="DOWN">离线</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <!-- 服务表格 -->
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full divide-y divide-gray-200">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">服务名称</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">版本</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">实例</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">状态</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">注册时间</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">最后心跳</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">限流状态</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">操作</th>
+                                </tr>
+                            </thead>
+                            <tbody class="bg-white divide-y divide-gray-200">
+                                <template v-if="filteredServices.length > 0">
+                                    <tr v-for="service in filteredServices" :key="service.id" class="hover:bg-gray-50 transition-all-300">
+                                        <td class="px-6 py-4 whitespace-nowrap">
+                                            <div class="flex items-center">
+                                                <div class="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary mr-3">
+                                                    <i class="fa fa-microchip"></i>
+                                                </div>
+                                                <div>
+                                                    <div class="text-sm font-medium text-gray-900">{{ service.serviceName }}</div>
+                                                    <div class="text-xs text-gray-500">{{ service.ip }}:{{ service.port }}</div>
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td class="px-6 py-4 whitespace-nowrap">
+                                            <span class="text-sm text-gray-900">{{ service.serviceVersion }}</span>
+                                        </td>
+                                        <td class="px-6 py-4 whitespace-nowrap">
+                                            <span class="text-sm text-gray-900">{{ getInstanceCount(service.serviceName) }}</span>
+                                        </td>
+                                        <td class="px-6 py-4 whitespace-nowrap">
+                                            <span v-if="service.status === 'UP'" class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
+                                                <i class="fa fa-check-circle mr-1"></i>在线
+                                            </span>
+                                            <span v-else class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800">
+                                                <i class="fa fa-times-circle mr-1"></i>离线
+                                            </span>
+                                        </td>
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                            {{ formatDateTime(service.registerTime) }}
+                                        </td>
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                            {{ formatHeartbeatTimeout(service.lastHeartbeat) }}
+                                        </td>
+                                        <td class="px-6 py-4 whitespace-nowrap">
+                                            <span v-if="service.rateLimitEnabled && service.maxRequestsPerSecond > 0" class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">
+                                                <i class="fa fa-tachometer-alt mr-1"></i>已启用 ({{ service.maxRequestsPerSecond }}/秒)
+                                            </span>
+                                            <span v-else class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-gray-100 text-gray-800">
+                                                <i class="fa fa-ban mr-1"></i>未启用
+                                            </span>
+                                        </td>
+                                        <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                            <button 
+                                                @click="viewServiceDetail(service)"
+                                                class="text-blue-500 hover:text-blue-700 mr-3"
+                                                title="查看详情"
+                                            >
+                                                <i class="fa fa-info-circle"></i>
+                                            </button>
+                                            <button 
+                                                @click="sendHeartbeat(service)"
+                                                class="text-green-500 hover:text-green-700 mr-3"
+                                                title="发送心跳"
+                                            >
+                                                <i class="fa fa-heartbeat"></i>
+                                            </button>
+                                            <button 
+                                                @click="openVirtualDomainModal(service)"
+                                                class="text-purple-500 hover:text-purple-700 mr-3"
+                                                title="设置虚拟域名"
+                                            >
+                                                <i class="fa fa-globe"></i>
+                                            </button>
+                                            <button 
+                                                @click="openRateLimitModal(service)"
+                                                class="text-primary hover:text-primary/80 mr-3"
+                                                title="设置限流"
+                                            >
+                                                <i class="fa fa-sliders-h"></i>
+                                            </button>
+                                            <button 
+                                                @click="deregisterService(service)"
+                                                class="text-red-500 hover:text-red-700"
+                                                title="注销服务"
+                                            >
+                                                <i class="fa fa-sign-out-alt"></i>
+                                            </button>
+                                        </td>
+                                    </tr>
+                                </template>
+                                <template v-else>
+                                    <tr>
+                                        <td colspan="8" class="px-6 py-10 text-center">
+                                            <div class="text-gray-400">
+                                                <i class="fa fa-server text-4xl mb-3"></i>
+                                                <p class="text-sm">点击右上角"注册服务"按钮添加第一个服务</p>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                </template>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </main>
+        
+        <!-- 页脚 -->
+        <footer class="bg-white border-t py-6">
+            <div class="container mx-auto px-4 text-center text-gray-500 text-sm">
+                <p>© 2023 服务注册中心 - 保持服务的稳定运行</p>
+                <p class="mt-1">最后更新时间: {{ lastUpdateTime }}</p>
+            </div>
+        </footer>
+        
+        <!-- 注册服务模态框 -->
+        <transition
+            enter-active-class="transition ease-out duration-300"
+            enter-from-class="opacity-0 scale-95"
+            enter-to-class="opacity-100 scale-100"
+            leave-active-class="transition ease-in duration-200"
+            leave-from-class="opacity-100 scale-100"
+            leave-to-class="opacity-0 scale-95">
+            <div v-if="showRegisterModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                <div class="bg-white rounded-lg max-w-md w-full p-6">
+                    <div class="flex justify-between items-center mb-6">
+                        <h3 class="text-xl font-bold text-gray-900">注册新服务</h3>
+                        <button @click="showRegisterModal = false" class="text-gray-400 hover:text-gray-600">
+                            <i class="fas fa-times text-xl"></i>
+                        </button>
+                    </div>
+
+                    <form @submit.prevent="handleRegisterService">
+                        <div class="space-y-4">
+                            <!-- 服务名称 -->
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">服务名称</label>
+                                <input 
+                                    v-model="newService.serviceName"
+                                    type="text" 
+                                    placeholder="例如：user-service"
+                                    class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                                    required>
+                            </div>
+
+                            <!-- 服务版本 -->
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">服务版本</label>
+                                <input 
+                                    v-model="newService.serviceVersion"
+                                    type="text" 
+                                    placeholder="例如：1.0.0"
+                                    class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                                    required>
+                            </div>
+
+                            <!-- IP地址 -->
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">IP地址</label>
+                                <input 
+                                    v-model="newService.ip"
+                                    type="text" 
+                                    placeholder="例如：127.0.0.1"
+                                    class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                                    required>
+                            </div>
+
+                            <!-- 端口号 -->
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">端口号</label>
+                                <input 
+                                    v-model="newService.port"
+                                    type="number" 
+                                    placeholder="例如：8080"
+                                    min="1" 
+                                    max="65535"
+                                    class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                                    required>
+                            </div>
+                        </div>
+
+                        <div class="flex justify-end space-x-3 mt-6">
+                            <button 
+                                type="button" 
+                                @click="showRegisterModal = false"
+                                class="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors">
+                                取消
+                            </button>
+                            <button 
+                                type="submit"
+                                class="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors">
+                                注册服务
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </transition>
+        
+        <!-- 限流设置模态框 -->
+        <transition
+            enter-active-class="transition ease-out duration-300"
+            enter-from-class="opacity-0 scale-95"
+            enter-to-class="opacity-100 scale-100"
+            leave-active-class="transition ease-in duration-200"
+            leave-from-class="opacity-100 scale-100"
+            leave-to-class="opacity-0 scale-95">
+            <div v-if="showRateLimitModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                <div class="bg-white rounded-lg max-w-md w-full p-6">
+                    <div class="flex justify-between items-center mb-6">
+                        <h3 class="text-xl font-bold text-gray-900">设置服务限流</h3>
+                        <button @click="closeRateLimitModal" class="text-gray-400 hover:text-gray-600">
+                            <i class="fas fa-times text-xl"></i>
+                        </button>
+                    </div>
+
+                    <div v-if="currentService" class="mb-4">
+                        <div class="text-sm text-gray-500">当前服务</div>
+                        <div class="font-medium">{{ currentService.serviceName }} ({{ currentService.serviceVersion }})</div>
+                        <div class="text-sm text-gray-500">{{ currentService.ip }}:{{ currentService.port }}</div>
+                    </div>
+
+                    <form @submit.prevent="saveRateLimitConfig">
+                        <div class="space-y-4">
+                            <!-- 限流开关 -->
+                            <div class="flex items-center justify-between">
+                                <label class="text-sm font-medium text-gray-700">启用限流</label>
+                                <div class="relative inline-block w-10 align-middle select-none">
+                                    <input 
+                                        v-model="rateLimitConfig.enabled"
+                                        type="checkbox" 
+                                        class="sr-only"
+                                    >
+                                    <div 
+                                        :class="[rateLimitConfig.enabled ? 'bg-primary' : 'bg-gray-300', 'block h-6 w-10 rounded-full']"
+                                        @click="rateLimitConfig.enabled = !rateLimitConfig.enabled"
+                                    >
+                                        <div 
+                                            :class="[
+                                                rateLimitConfig.enabled ? 'translate-x-4 bg-white' : 'translate-x-0 bg-white',
+                                                'h-5 w-5 rounded-full shadow transform transition transform duration-200 ease-in'
+                                            ]"
+                                        ></div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- 最大请求数 -->
+                            <div v-if="rateLimitConfig.enabled">
+                                <label class="block text-sm font-medium text-gray-700 mb-2">最大请求数/秒</label>
+                                <input 
+                                    v-model.number="rateLimitConfig.maxRequestsPerSecond"
+                                    type="number" 
+                                    placeholder="例如：100"
+                                    min="1"
+                                    class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                                >
+                            </div>
+
+                            <!-- 限流提示消息 -->
+                            <div v-if="rateLimitConfig.enabled">
+                                <label class="block text-sm font-medium text-gray-700 mb-2">限流提示消息</label>
+                                <input 
+                                    v-model="rateLimitConfig.errorMessage"
+                                    type="text" 
+                                    placeholder="例如：服务暂时繁忙，请稍后再试"
+                                    class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                                >
+                            </div>
+                        </div>
+
+                        <div class="flex justify-end space-x-3 mt-6">
+                            <button 
+                                type="button" 
+                                @click="closeRateLimitModal"
+                                class="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors">
+                                取消
+                            </button>
+                            <button 
+                                type="submit"
+                                class="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors">
+                                保存设置
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </transition>
+        
+        <!-- 服务详情模态框 -->
+        <transition
+            enter-active-class="transition ease-out duration-300"
+            enter-from-class="opacity-0 scale-95"
+            enter-to-class="opacity-100 scale-100"
+            leave-active-class="transition ease-in duration-200"
+            leave-from-class="opacity-100 scale-100"
+            leave-to-class="opacity-0 scale-95">
+            <div v-if="showServiceDetailModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                <div class="bg-white rounded-lg max-w-lg w-full p-6">
+                    <div class="flex justify-between items-center mb-6">
+                        <h3 class="text-xl font-bold text-gray-900">服务详情</h3>
+                        <button @click="closeServiceDetailModal" class="text-gray-400 hover:text-gray-600">
+                            <i class="fas fa-times text-xl"></i>
+                        </button>
+                    </div>
+
+                    <div v-if="currentService" class="space-y-4">
+                        <div class="grid grid-cols-3 gap-4">
+                            <div class="col-span-1 font-medium text-gray-700">服务名称：</div>
+                            <div class="col-span-2">{{ currentService.serviceName }}</div>
+                        </div>
+                        <div class="grid grid-cols-3 gap-4">
+                            <div class="col-span-1 font-medium text-gray-700">服务版本：</div>
+                            <div class="col-span-2">{{ currentService.serviceVersion }}</div>
+                        </div>
+                        <div class="grid grid-cols-3 gap-4">
+                            <div class="col-span-1 font-medium text-gray-700">IP地址：</div>
+                            <div class="col-span-2">{{ currentService.ip }}</div>
+                        </div>
+                        <div class="grid grid-cols-3 gap-4">
+                            <div class="col-span-1 font-medium text-gray-700">端口：</div>
+                            <div class="col-span-2">{{ currentService.port }}</div>
+                        </div>
+                        <div class="grid grid-cols-3 gap-4">
+                            <div class="col-span-1 font-medium text-gray-700">服务状态：</div>
+                            <div class="col-span-2">
+                                <span v-if="currentService.status === 'UP'" class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
+                                    <i class="fa fa-check-circle mr-1"></i>在线
+                                </span>
+                                <span v-else class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800">
+                                    <i class="fa fa-times-circle mr-1"></i>离线
+                                </span>
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-3 gap-4">
+                            <div class="col-span-1 font-medium text-gray-700">注册时间：</div>
+                            <div class="col-span-2">{{ formatDateTime(currentService.registerTime) }}</div>
+                        </div>
+                        <div class="grid grid-cols-3 gap-4">
+                            <div class="col-span-1 font-medium text-gray-700">最后心跳：</div>
+                            <div class="col-span-2">{{ formatDateTime(currentService.lastHeartbeat) }}</div>
+                        </div>
+                        <div class="grid grid-cols-3 gap-4" v-if="currentService.virtualDomain">
+                            <div class="col-span-1 font-medium text-gray-700">虚拟域名：</div>
+                            <div class="col-span-2">{{ currentService.virtualDomain }}</div>
+                        </div>
+                        <div class="grid grid-cols-3 gap-4" v-if="currentService.rateLimitEnabled">
+                            <div class="col-span-1 font-medium text-gray-700">限流设置：</div>
+                            <div class="col-span-2">
+                                已启用 ({{ currentService.maxRequestsPerSecond }}/秒)
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="flex justify-center mt-6">
+                        <button 
+                            type="button" 
+                            @click="closeServiceDetailModal"
+                            class="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors"
+                        >
+                            关闭
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </transition>
+        
+        <!-- 虚拟域名设置模态框 -->
+        <transition
+            enter-active-class="transition ease-out duration-300"
+            enter-from-class="opacity-0 scale-95"
+            enter-to-class="opacity-100 scale-100"
+            leave-active-class="transition ease-in duration-200"
+            leave-from-class="opacity-100 scale-100"
+            leave-to-class="opacity-0 scale-95">
+            <div v-if="showVirtualDomainModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                <div class="bg-white rounded-lg max-w-md w-full p-6">
+                    <div class="flex justify-between items-center mb-6">
+                        <h3 class="text-xl font-bold text-gray-900">设置虚拟域名</h3>
+                        <button @click="closeVirtualDomainModal" class="text-gray-400 hover:text-gray-600">
+                            <i class="fas fa-times text-xl"></i>
+                        </button>
+                    </div>
+
+                    <div v-if="currentService" class="mb-4">
+                        <div class="text-sm text-gray-500">当前服务</div>
+                        <div class="font-medium">{{ currentService.serviceName }} ({{ currentService.serviceVersion }})</div>
+                        <div class="text-sm text-gray-500">{{ currentService.ip }}:{{ currentService.port }}</div>
+                    </div>
+
+                    <form @submit.prevent="saveVirtualDomainConfig">
+                        <div class="space-y-4">
+                            <!-- 虚拟域名输入框 -->
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">虚拟域名</label>
+                                <input 
+                                    v-model="virtualDomainConfig.virtualDomain"
+                                    type="text" 
+                                    placeholder="例如：service.example.com"
+                                    class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                                >
+                                <div class="text-xs text-gray-500 mt-1">设置后可通过此域名访问服务，留空则取消虚拟域名</div>
+                            </div>
+                        </div>
+
+                        <div class="flex justify-end space-x-3 mt-6">
+                            <button 
+                                type="button" 
+                                @click="closeVirtualDomainModal"
+                                class="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors">
+                                取消
+                            </button>
+                            <button 
+                                type="submit"
+                                class="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors">
+                                保存设置
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </transition>
+    </div>
+
+    <!-- JavaScript -->
+    <script src="/js/app.js"></script>
+</body>
+</html>

@@ -16,6 +16,8 @@
 - ✅ **限流控制** - 支持对服务进行限流控制，保护服务稳定运行
 - ✅ **Web管理界面** - 提供友好的Web界面管理注册的服务
 
+[img src="/data/p1.jpg" alt="register-center"]
+
 ## 技术栈
 
 - **后端框架**: Spring Boot 3.3.4
